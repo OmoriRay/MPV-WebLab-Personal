@@ -1,0 +1,24 @@
+# Runtime data and private credentials
+credentials/
+cache/
+temp/
+watch_later/
+*-cookies.txt
+
+# Generated release assets and staging
+release-output/
+release-test-output/
+*.7z
+*.zip
+SHA256SUMS.txt
+*.manifest.json
+
+# Build output and logs
+bin/
+obj/
+publish/
+*.log
+*.pdb
+*.tmp
+*.bak
+

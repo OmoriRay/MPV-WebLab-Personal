@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MPV WebLab Cookie Sync</title>
+  <style>
+    :root { color-scheme: light dark; font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+    body { min-width: 318px; margin: 0; padding: 16px; background: Canvas; color: CanvasText; }
+    header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    h1 { font-size: 16px; margin: 0; }
+    .version { color: GrayText; font-size: 11px; }
+    .notice { display: none; margin: 12px 0 0; padding: 10px; border-radius: 10px; background: #d9770618; border: 1px solid #d9770655; }
+    .notice.visible { display: block; }
+    section { margin-top: 12px; padding: 12px; border: 1px solid #8884; border-radius: 12px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    h2 { font-size: 13px; margin: 0; }
+    p { font-size: 12px; line-height: 1.45; margin: 5px 0 0; }
+    .status { font-weight: 650; }
+    .ok { color: #16803c; }
+    .error { color: #c43d3d; }
+    .pending { color: #b66a00; }
+    .syncing { color: #2563eb; }
+    .detail, .time { color: GrayText; }
+    button { border: 1px solid #8885; border-radius: 9px; padding: 6px 10px; font: inherit; cursor: pointer; background: ButtonFace; color: ButtonText; }
+    button:hover { border-color: #3b82f6; }
+    button:disabled { cursor: wait; opacity: .55; }
+    .primary { margin-top: 8px; width: 100%; background: #2563eb; color: white; border-color: #2563eb; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MPV WebLab Cookie 同步</h1>
+    <span class="version"></span>
+  </header>
+  <div class="notice" data-version-notice>
+    <p>检测到扩展文件已更新，需要重载一次才能使用新版本。</p>
+    <button class="primary" data-reload>重载扩展</button>
+  </div>
+  <section data-site="youtube">
+    <div class="section-head"><h2>YouTube</h2><button data-sync>立即同步</button></div>
+    <p class="status">读取中…</p><p class="time"></p><p class="detail"></p>
+  </section>
+  <section data-site="bilibili">
+    <div class="section-head"><h2>Bilibili</h2><button data-sync>立即同步</button></div>
+    <p class="status">读取中…</p><p class="time"></p><p class="detail"></p>
+  </section>
+  <section data-native-host>
+    <div class="section-head"><h2>本机同步程序</h2><button data-health>检查</button></div>
+    <p class="status">读取中…</p><p class="detail"></p>
+  </section>
+  <script src="status.js"></script>
+</body>
+</html>
