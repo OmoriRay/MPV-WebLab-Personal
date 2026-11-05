@@ -32,6 +32,24 @@ const EXPORT_DELAY_MILLISECONDS = 5000;
 const RETRY_DELAYS_MILLISECONDS = [30_000, 120_000, 600_000];
 const NATIVE_HOST_NAME = 'mpv_weblab_youtube_cookie_sync';
 const inFlightExports = new Set();
+const stateOperations = new Map();
+
+function runBackground(task) {
+    void task.catch(() => {
+        // Never log the exception: browser errors may contain cookie data or
+        // native-host paths. The durable schedule is recovered on next boot.
+        console.warn('MPV WebLab 后台任务失败，请重试或重新加载扩展。');
+    });
+}
+
+// Serialize only storage transactions, never the native-host wait. New requests
+// must reach durable storage while an export is running.
+function withSiteState(site, operation) {
+    const previous = stateOperations.get(site) || Promise.resolve();
+    const next = previous.catch(() => {}).then(operation);
+    stateOperations.set(site, next);
+    return next;
+}
 
 function siteEntry(site) {
     return SITES.find(entry => entry.site === site);
@@ -153,24 +171,21 @@ async function scheduleExport(
     if (!siteEntry(site)) {
         return false;
     }
-    const when = Date.now() + Math.max(0, delay);
-    const current = await readState(site);
-    if (current.dueAt && current.dueAt <= when &&
-        ['pending', 'error'].includes(current.status) &&
-        !forceNative) {
-        return false;
-    }
-    await writeState(site, {
-        status: 'pending',
-        dueAt: when,
-        reason,
-        forceNative: Boolean(forceNative || current.forceNative),
-        error: '',
-        errorCode: '',
-        errorHint: '',
+    return withSiteState(site, async () => {
+        const current = await readState(site);
+        const when = Date.now() + Math.max(0, delay);
+        const dueAt = current.dueAt > 0 ? Math.min(current.dueAt, when) : when;
+        await writeState(site, {
+            status: 'pending',
+            requestGeneration: (Number(current.requestGeneration) || 0) + 1,
+            dueAt,
+            reason,
+            forceNative: Boolean(forceNative || current.forceNative),
+            error: '', errorCode: '', errorHint: '',
+        });
+        await chrome.alarms.create(alarmName(site), { when: dueAt });
+        return true;
     });
-    chrome.alarms.create(alarmName(site), { when });
-    return true;
 }
 
 async function scheduleAllExports(delay, reason, forceNative = false) {
@@ -178,32 +193,42 @@ async function scheduleAllExports(delay, reason, forceNative = false) {
         scheduleExport(entry.site, delay, reason, forceNative)));
 }
 
-async function scheduleRetry(site, attempt, errorDetails) {
-    const delay = RETRY_DELAYS_MILLISECONDS[
-        Math.min(attempt - 1, RETRY_DELAYS_MILLISECONDS.length - 1)];
-    const when = Date.now() + delay;
-    await writeState(site, {
-        status: 'error',
-        lastAttemptAt: Date.now(),
-        retryAttempt: attempt,
-        dueAt: when,
-        reason: 'retry',
-        forceNative: true,
-        error: errorDetails.message,
-        errorCode: errorDetails.code,
-        errorHint: errorDetails.hint,
+async function finishExport(site, previous, result, error) {
+    return withSiteState(site, async () => {
+        const current = await readState(site);
+        const hasFollowup = current.requestGeneration !== previous.requestGeneration;
+        if (error) {
+            const attempt = Math.max(0, Number(previous.retryAttempt) || 0) + 1;
+            const delay = RETRY_DELAYS_MILLISECONDS[
+                Math.min(attempt - 1, RETRY_DELAYS_MILLISECONDS.length - 1)];
+            const retryAt = Date.now() + delay;
+            const details = classifySyncError(error);
+            const dueAt = hasFollowup && current.dueAt > 0
+                ? Math.min(current.dueAt, retryAt) : retryAt;
+            await writeState(site, {
+                status: 'error', activeRequest: null,
+                lastAttemptAt: Date.now(), retryAttempt: attempt,
+                dueAt, reason: hasFollowup ? current.reason : 'retry',
+                forceNative: true,
+                error: details.message, errorCode: details.code, errorHint: details.hint,
+            });
+            return;
+        }
+        await writeState(site, {
+            ...result,
+            status: hasFollowup ? 'pending' : 'ok', activeRequest: null,
+            lastSyncAt: Date.now(), retryAttempt: 0,
+            dueAt: hasFollowup ? current.dueAt : 0,
+            forceNative: hasFollowup ? current.forceNative : false,
+            error: '', errorCode: '', errorHint: '',
+        });
+
     });
-    chrome.alarms.create(alarmName(site), { when });
 }
 
-async function exportSiteCookies(entry) {
-    const previous = await readState(entry.site);
-    await writeState(entry.site, {
-        status: 'syncing',
-        lastAttemptAt: Date.now(),
-        dueAt: 0,
-        error: '',
-    });
+async function exportSiteCookies(entry, previous) {
+    let result;
+    let failure;
     try {
         const cookies = await chrome.cookies.getAll({ domain: entry.queryDomain });
         const text = serializeSiteCookies(entry.site, cookies);
@@ -211,52 +236,61 @@ async function exportSiteCookies(entry) {
         let response = null;
         if (previous.forceNative || previous.contentHash !== contentHash) {
             response = await chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, {
-                version: 1,
-                operation: 'sync',
-                site: entry.site,
-                cookiesText: text,
+                version: 1, operation: 'sync', site: entry.site, cookiesText: text,
             });
             if (response?.ok !== true) {
                 throw new Error('本机同步程序没有接受 Cookie');
             }
         }
-        const cookieCount = text.split('\n')
-            .filter(line => line.split('\t').length >= 7).length;
-        await writeState(entry.site, {
-            status: 'ok',
-            lastSyncAt: Date.now(),
-            cookieCount,
+        result = {
+            cookieCount: text.split('\n').filter(line => line.split('\t').length >= 7).length,
             contentHash,
             hostVersion: response?.hostVersion || previous.hostVersion || '',
             changed: response?.changed === true,
-            retryAttempt: 0,
-            dueAt: 0,
-            forceNative: false,
-            error: '',
-            errorCode: '',
-            errorHint: '',
-        });
+        };
     } catch (error) {
-        const attempt = Math.max(0, Number(previous.retryAttempt) || 0) + 1;
-        await scheduleRetry(entry.site, attempt, classifySyncError(error));
+        failure = error;
     }
+    await finishExport(entry.site, previous, result, failure);
 }
 
 async function handleAlarm(alarm) {
-    const entry = SITES.find(candidate =>
-        alarmName(candidate.site) === alarm?.name);
-    if (!entry) {
-        return;
-    }
-    if (inFlightExports.has(entry.site)) {
-        await scheduleExport(entry.site, 1000, 'changed-during-sync', true);
-        return;
-    }
-    inFlightExports.add(entry.site);
+    const entry = SITES.find(candidate => alarmName(candidate.site) === alarm?.name);
+    if (!entry) return;
+    const previous = await withSiteState(entry.site, async () => {
+        if (inFlightExports.has(entry.site)) return null;
+        const state = await readState(entry.site);
+        if (!['pending', 'error'].includes(state.status)) return null;
+        inFlightExports.add(entry.site);
+        try {
+            const requestGeneration = Number(state.requestGeneration) || 0;
+            await writeState(entry.site, {
+                status: 'syncing', lastAttemptAt: Date.now(), dueAt: 0,
+                requestGeneration, activeRequest: requestGeneration,
+                forceNative: false, error: '',
+            });
+            return { ...state, requestGeneration };
+        } catch (error) {
+            inFlightExports.delete(entry.site);
+            throw error;
+        }
+    });
+    if (!previous) return;
     try {
-        await exportSiteCookies(entry);
+        await exportSiteCookies(entry, previous);
     } finally {
         inFlightExports.delete(entry.site);
+        // Rearm only after releasing the in-flight guard. An immediately fired
+        // alarm can then wait for this storage transaction and claim the work,
+        // even if alarms.create() acknowledges it after dispatching the event.
+        await withSiteState(entry.site, async () => {
+            const current = await readState(entry.site);
+            if (current.dueAt > 0 && ['pending', 'error'].includes(current.status)) {
+                await chrome.alarms.create(alarmName(entry.site), {
+                    when: Math.max(Date.now(), current.dueAt),
+                });
+            }
+        });
     }
 }
 
@@ -296,42 +330,49 @@ async function checkNativeHealth() {
 
 async function initialize() {
     for (const entry of SITES) {
-        const state = await readState(entry.site);
-        if (!state.status) {
-            await scheduleExport(entry.site, 250, 'initial', true);
-        } else if (state.status === 'syncing') {
-            await scheduleExport(entry.site, 250, 'recover-interrupted', true);
-        } else if (state.dueAt && ['pending', 'error'].includes(state.status)) {
-            chrome.alarms.create(alarmName(entry.site), {
-                when: Math.max(Date.now() + 100, state.dueAt),
-            });
-        }
+        await withSiteState(entry.site, async () => {
+            const state = await readState(entry.site);
+            if (!state.status || state.status === 'syncing' || state.activeRequest != null) {
+                const dueAt = Date.now() + 250;
+                await writeState(entry.site, {
+                    status: 'pending', activeRequest: null,
+                    requestGeneration: (Number(state.requestGeneration) || 0) + 1,
+                    dueAt, reason: state.status ? 'recover-interrupted' : 'initial',
+                    forceNative: true,
+                });
+                await chrome.alarms.create(alarmName(entry.site), { when: dueAt });
+            } else if (state.dueAt && ['pending', 'error'].includes(state.status)) {
+                await chrome.alarms.create(alarmName(entry.site), {
+                    when: Math.max(Date.now() + 100, state.dueAt),
+                });
+            }
+        });
     }
     await refreshActionBadge();
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-    void scheduleAllExports(250, 'installed', true);
-    void checkNativeHealth();
+    runBackground(scheduleAllExports(250, 'installed', true));
+    runBackground(checkNativeHealth());
 });
 chrome.runtime.onStartup.addListener(() => {
-    void scheduleAllExports(250, 'startup', true);
-    void checkNativeHealth();
+    runBackground(scheduleAllExports(250, 'startup', true));
+    runBackground(checkNativeHealth());
 });
 chrome.cookies.onChanged.addListener(changeInfo => {
     for (const entry of SITES) {
         if (shouldSyncForCookieChange(entry.site, changeInfo?.cookie)) {
-            void scheduleExport(entry.site);
+            runBackground(scheduleExport(entry.site));
         }
     }
 });
 chrome.alarms.onAlarm.addListener(alarm => {
-    void handleAlarm(alarm);
+    runBackground(handleAlarm(alarm));
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'sync-now' && siteEntry(message.site)) {
         scheduleExport(message.site, 0, 'manual', true)
-            .then(() => sendResponse({ ok: true }))
+            .then(() => sendResponse({ ok: true, queued: true }))
             .catch(() => sendResponse({ ok: false }));
         return true;
     }
@@ -344,4 +385,4 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
 });
 
-void initialize();
+runBackground(initialize());

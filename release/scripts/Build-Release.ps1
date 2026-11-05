@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$')]
-    [string] $Version = '1.0.0',
+    [string] $Version = '1.0.1',
     [string] $SourceRoot = 'D:\Apps\MPV-WebLab',
     [string] $OutputRoot = '',
     [switch] $SkipArchive,
@@ -52,7 +52,7 @@ $excludedDirectoryNames = @(
     'cache', 'credentials', 'temp', 'watch_later', 'bin', 'obj', 'publish'
 )
 $excludedFileNames = @(
-    '*.bak', '*.log', '*.pdb', '*.tmp', '*-cookies.txt', 'bilibili-cookies.txt',
+    '*.bak', '*.log', '*.pdb', '*.tmp', '*.lock', '*-cookies.txt', 'bilibili-cookies.txt',
     'youtube-cookies.txt', 'argv-recorder.exe'
 )
 foreach ($directory in $runtimeDirectories) {
@@ -71,21 +71,23 @@ $allowedRootExtensions = @(
     '.ax', '.cat', '.com', '.config', '.dll', '.exe', '.in', '.ini', '.manifest',
     '.md', '.py', '.pyd', '.pth', '.txt', '.vs', '.zip'
 )
+$allowedRootNames = @('COPYING', 'LICENSE', 'LICENSE.txt')
 $excludedRootNames = @(
     'register-native-host.ps1',
     'ReShade.log', 'ReShade2.log', 'ReShade3.log', 'ReShade4.log', 'ReShade5.log'
 )
 foreach ($file in Get-ChildItem -LiteralPath $SourceRoot -File) {
-    if ($allowedRootExtensions -notcontains $file.Extension.ToLowerInvariant()) {
+    if ($allowedRootExtensions -notcontains $file.Extension.ToLowerInvariant() -and
+        $allowedRootNames -notcontains $file.Name) {
         continue
     }
-    if ($excludedRootNames -contains $file.Name -or $file.Name -match '\.(log|pdb|tmp|bak)$') {
+    if ($excludedRootNames -contains $file.Name -or $file.Name -match '\.(log|pdb|tmp|bak|lock)$|cookies\.txt$') {
         continue
     }
     Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $payloadRoot $file.Name) -Force
 }
 
-$userscriptSource = Join-Path $repositoryRoot 'dist\external-player-weblab-safe-1.5.1.user.js'
+$userscriptSource = Join-Path $repositoryRoot 'dist\external-player-weblab-safe-1.5.2.user.js'
 if (-not (Test-Path -LiteralPath $userscriptSource -PathType Leaf)) {
     $userscriptSource = Join-Path $SourceRoot 'external-player-weblab-safe.user.js'
 }

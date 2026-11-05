@@ -2,7 +2,7 @@
 // @name                    External Player · WebLab Safe
 // @name:zh-CN              外部播放器 · WebLab 安全版
 // @namespace               external-player/weblab-safe-local
-// @version                 1.5.1
+// @version                 1.5.2
 // @description             Launch supported video pages in MPV WebLab with a small, isolated W button.
 // @match                   *://bilibili.com/*
 // @match                   *://*.bilibili.com/*
@@ -19,17 +19,21 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.5.1';
+    const VERSION = '1.5.2';
     const SCHEME_PREFIX = 'ush-weblab://MPVNET?v2.';
     const BUTTON_HOST_ID = 'mpv-weblab-lite-root';
     const LAUNCH_COOLDOWN_MS = 2000;
     const FALLBACK_ROUTE_CHECK_MS = 15_000;
     const VOD_MANIFEST_MAX_LENGTH = 16_000;
+    const VOD_MANIFEST_TTL_MS = 5 * 60_000;
     const manifestCache = new Map();
     let lastUrl = '';
     let lastLaunchKey = '';
     let lastLaunchAt = 0;
-    let prefetchController = null;
+    const VOD_PREFETCH_TIMEOUT_MS = 8000;
+    const VOD_RETRY_BASE_MS = 15_000;
+    const manifestFailures = new Map();
+    let prefetchTask = null;
     let button;
     let toast;
 
@@ -95,7 +99,12 @@
         if ((host === 'bilibili.com' || host === 'www.bilibili.com') &&
             (parsed.pathname === '/list/watchlater' ||
                 parsed.pathname === '/list/watchlater/')) {
-            return `https://www.bilibili.com/video/${parsed.searchParams.get('bvid')}/`;
+            const stable = new URL(`https://www.bilibili.com/video/${parsed.searchParams.get('bvid')}/`);
+            const part = parsed.searchParams.get('p');
+            if (/^[1-9]\d*$/.test(part || '')) {
+                stable.searchParams.set('p', part);
+            }
+            return stable.href;
         }
         if (host === 'bilibili.com' || host === 'www.bilibili.com') {
             const video = parsed.pathname.match(/^\/video\/(BV[A-Za-z0-9]+|av\d+)\/?$/i);
@@ -164,6 +173,7 @@
     }
 
     async function fetchJson(url, signal) {
+        signal.throwIfAborted();
         const response = await fetch(url, {
             method: 'GET',
             credentials: 'include',
@@ -172,7 +182,9 @@
         if (!response.ok) {
             throw new Error('request failed');
         }
-        return response.json();
+        const data = await response.json();
+        signal.throwIfAborted();
+        return data;
     }
 
     async function resolveBilibiliVideo(pageUrl, signal) {
@@ -345,28 +357,77 @@
         }
     }
 
-    function beginManifestPrefetch(pageUrl) {
-        prefetchController?.abort();
-        prefetchController = null;
-        if (!isBilibiliVod(pageUrl) || manifestCache.has(pageUrl)) {
-            return;
+    function getCachedManifest(pageUrl) {
+        const cached = manifestCache.get(pageUrl);
+        if (!cached) {
+            return '';
         }
-        const controller = new AbortController();
-        prefetchController = controller;
-        setTimeout(() => {
-            if (controller.signal.aborted) {
-                return;
-            }
-            createBilibiliManifest(pageUrl, controller.signal)
-                .then(manifest => {
-                    if (manifest) {
-                        manifestCache.set(pageUrl, manifest);
-                        while (manifestCache.size > 5) {
-                            manifestCache.delete(manifestCache.keys().next().value);
-                        }
+        const age = Date.now() - cached.createdAt;
+        if (age < 0 || age >= VOD_MANIFEST_TTL_MS) {
+            manifestCache.delete(pageUrl);
+            return '';
+        }
+        return cached.manifest;
+    }
+
+    function cancelManifestPrefetch() {
+        if (!prefetchTask) return;
+        const task = prefetchTask;
+        prefetchTask = null;
+        task.cancelled = true;
+        clearTimeout(task.delayTimer);
+        task.controller.abort();
+    }
+
+    function beginManifestPrefetch(pageUrl) {
+        // Repeated clicks/checks must neither duplicate nor postpone the same work.
+        if (prefetchTask?.pageUrl === pageUrl) return;
+        cancelManifestPrefetch();
+        if (!isBilibiliVod(pageUrl) || getCachedManifest(pageUrl)) return;
+        const failure = manifestFailures.get(pageUrl);
+        if (failure && Date.now() < failure.retryAt) return;
+        const task = { pageUrl, controller: new AbortController(), cancelled: false };
+        prefetchTask = task;
+        task.delayTimer = setTimeout(async () => {
+            let deadline;
+            let onAbort;
+            try {
+                // Bound the entire metadata + playurl chain, including JSON bodies.
+                const stopped = new Promise((_, reject) => {
+                    onAbort = () => reject(new Error('prefetch cancelled'));
+                    task.controller.signal.addEventListener('abort', onAbort, { once: true });
+                    deadline = setTimeout(() => {
+                        task.controller.abort();
+                    }, VOD_PREFETCH_TIMEOUT_MS);
+                });
+                const manifest = await Promise.race([
+                    createBilibiliManifest(pageUrl, task.controller.signal), stopped,
+                ]);
+                if (!manifest) throw new Error('manifest unavailable');
+                if (!task.cancelled && !task.controller.signal.aborted) {
+                    manifestFailures.delete(pageUrl);
+                    manifestCache.set(pageUrl, { manifest, createdAt: Date.now() });
+                    while (manifestCache.size > 5) {
+                        manifestCache.delete(manifestCache.keys().next().value);
                     }
-                })
-                .catch(() => undefined);
+                }
+            } catch {
+                if (!task.cancelled) {
+                    const attempts = Math.min((failure?.attempts || 0) + 1, 4);
+                    manifestFailures.delete(pageUrl);
+                    manifestFailures.set(pageUrl, {
+                        attempts,
+                        retryAt: Date.now() + VOD_RETRY_BASE_MS * 2 ** (attempts - 1),
+                    });
+                    while (manifestFailures.size > 5) {
+                        manifestFailures.delete(manifestFailures.keys().next().value);
+                    }
+                }
+            } finally {
+                clearTimeout(deadline);
+                task.controller.signal.removeEventListener('abort', onAbort);
+                if (prefetchTask === task) prefetchTask = null;
+            }
         }, 650);
     }
 
@@ -401,7 +462,10 @@
             showToast('启动请求已发送');
             return;
         }
-        const manifest = manifestCache.get(pageUrl);
+        const manifest = getCachedManifest(pageUrl);
+        if (!manifest) {
+            beginManifestPrefetch(pageUrl);
+        }
         const request = buildLaunchRequest(pageUrl, manifest);
         lastLaunchKey = pageUrl;
         lastLaunchAt = now;
@@ -420,12 +484,96 @@
         }
     }
 
+    function installButtonReveal(host, wrap, launchButton) {
+        const touchOnly = window.matchMedia?.('(hover: none)')?.matches === true;
+        wrap.dataset.revealed = touchOnly ? 'true' : 'false';
+        if (touchOnly) {
+            return;
+        }
+        let nearby = false;
+        let keyboardFocused = false;
+        let windowFocused = true;
+        let hideTimer = null;
+        let frame = null;
+        let pointer = null;
+        const setRevealed = value => {
+            if (wrap.dataset.revealed !== value) wrap.dataset.revealed = value;
+        };
+        const syncVisibility = () => {
+            if (nearby || (keyboardFocused && windowFocused)) {
+                clearTimeout(hideTimer);
+                hideTimer = null;
+                setRevealed('true');
+            } else if (hideTimer === null && wrap.dataset.revealed === 'true') {
+                // Do not restart this timer on every movement outside the button.
+                hideTimer = setTimeout(() => {
+                    hideTimer = null;
+                    setRevealed('false');
+                }, 500);
+            }
+        };
+        const leave = () => {
+            pointer = null;
+            if (frame !== null) cancelAnimationFrame(frame);
+            frame = null;
+            nearby = false;
+            syncVisibility();
+        };
+        // Observe coordinates instead of placing a transparent hitbox over the page.
+        window.addEventListener('pointermove', event => {
+            if (event.pointerType === 'touch' || host.style.display === 'none') {
+                leave();
+                return;
+            }
+            pointer = { x: event.clientX, y: event.clientY };
+            if (frame !== null) return;
+            frame = requestAnimationFrame(() => {
+                frame = null;
+                if (!pointer || host.style.display === 'none') return;
+                const rect = wrap.getBoundingClientRect();
+                const margin = 24;
+                nearby = rect.width > 0 && rect.height > 0 &&
+                    pointer.x >= rect.left - margin && pointer.x <= rect.right + margin &&
+                    pointer.y >= rect.top - margin && pointer.y <= rect.bottom + margin;
+                syncVisibility();
+            });
+        }, { passive: true, capture: true });
+        launchButton.addEventListener('focus', () => {
+            keyboardFocused = launchButton.matches(':focus-visible');
+            syncVisibility();
+        });
+        launchButton.addEventListener('blur', () => {
+            keyboardFocused = false;
+            syncVisibility();
+        });
+        window.addEventListener('blur', () => {
+            windowFocused = false;
+            leave();
+        });
+        window.addEventListener('focus', () => {
+            windowFocused = true;
+            syncVisibility();
+        });
+        window.addEventListener('resize', leave, { passive: true });
+        document.addEventListener('pointerleave', leave, { passive: true });
+        document.addEventListener('fullscreenchange', leave);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                windowFocused = false;
+                leave();
+            }
+        });
+    }
+
     function mountButton() {
         if (document.getElementById(BUTTON_HOST_ID) || !document.body) {
             return;
         }
         const host = document.createElement('div');
         host.id = BUTTON_HOST_ID;
+        // Reserve the bottom control strip in Bilibili Live's web-player mode.
+        host.dataset.site = new URL(location.href).hostname.toLowerCase().replace(/\.$/, '') ===
+            'live.bilibili.com' ? 'bilibili-live' : '';
         const shadow = host.attachShadow({ mode: 'closed' });
         const style = document.createElement('style');
         style.textContent = `
@@ -435,7 +583,17 @@
             left: 16px;
             bottom: 16px;
             z-index: 2147483647;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .35s ease-in-out;
             font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+          }
+          .wrap[data-revealed="true"] {
+            opacity: 1;
+            pointer-events: auto;
+          }
+          :host([data-site="bilibili-live"]) .wrap {
+            bottom: 88px;
           }
           button {
             position: relative;
@@ -536,7 +694,7 @@
           .toast[data-kind="error"] { background: rgba(116,28,35,.96); border-color: rgba(255,150,150,.18); }
           @keyframes breathe { to { opacity: .36; transform: scale(.76); } }
           @media (prefers-reduced-motion: reduce) {
-            button, button::before, .toast { transition: none; }
+            .wrap, button, button::before, .toast { transition: none; }
             button[data-state="busy"] .play { animation: none; }
           }
         `;
@@ -561,10 +719,14 @@
         wrap.append(toast, button);
         shadow.append(style, wrap);
         document.body.appendChild(host);
+        installButtonReveal(host, wrap, button);
     }
 
     function updateForRoute() {
         if (lastUrl === location.href) {
+            if (!prefetchTask && isSupportedPage(location.href)) {
+                beginManifestPrefetch(normalizePageUrl(location.href));
+            }
             return;
         }
         lastUrl = location.href;
@@ -577,7 +739,7 @@
         if (supported) {
             beginManifestPrefetch(normalizePageUrl(location.href));
         } else {
-            prefetchController?.abort();
+            cancelManifestPrefetch();
         }
     }
 
@@ -595,6 +757,26 @@
         }
     }
 
+    // One runtime per page, including when a userscript manager reinjects it.
+    const runtimeKey = Symbol.for('mpv-weblab-lite.runtime');
+    if (window[runtimeKey]) return;
+    window[runtimeKey] = true;
+    // Preserve native this/return/throw semantics and notify only after success.
+    for (const method of ['pushState', 'replaceState']) {
+        const original = window.history?.[method];
+        if (typeof original !== 'function') continue;
+        try {
+            window.history[method] = function (...args) {
+                const result = Reflect.apply(original, this, args);
+                updateForRoute();
+                return result;
+            };
+        } catch {
+            // Some hosts lock history methods; native events + polling remain.
+        }
+    }
+    window.navigation?.addEventListener('navigatesuccess', updateForRoute);
+
     for (const eventName of [
         'urlchange', 'popstate', 'hashchange', 'yt-navigate-finish',
     ]) {
@@ -607,7 +789,8 @@
                 (isSupportedPage(location.href) ? '' : 'none');
         }
     });
-    window.addEventListener('beforeunload', () => prefetchController?.abort());
+    window.addEventListener('beforeunload', cancelManifestPrefetch);
+    window.addEventListener('pagehide', cancelManifestPrefetch);
     setInterval(() => {
         if (!document.hidden) {
             updateForRoute();

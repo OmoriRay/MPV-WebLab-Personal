@@ -1,8 +1,8 @@
-const EXPECTED_EXTENSION_VERSION = '0.5.1';
+const EXPECTED_EXTENSION_VERSION = '0.5.2';
 const labels = {
     ok: '已同步',
     error: '同步失败',
-    pending: '等待同步',
+    pending: '已排队',
     syncing: '正在同步',
 };
 
@@ -77,22 +77,42 @@ async function render() {
     renderSite('youtube', values['syncStatus:youtube'] || {});
     renderSite('bilibili', values['syncStatus:bilibili'] || {});
     renderHost(values.nativeHostStatus || {});
+    return values;
 }
 
 async function sendMessage(message) {
     const response = await chrome.runtime.sendMessage(message);
     if (response?.ok !== true) {
-        throw new Error('操作失败');
+        throw new Error(response?.status?.errorHint || response?.status?.error || '操作失败，请重试。');
     }
+    return response;
+}
+
+function showActionError(root, error) {
+    const status = root.querySelector('.status');
+    status.textContent = '操作失败';
+    status.className = 'status error';
+    root.querySelector('.detail').textContent =
+        `请求失败：${error?.message || '扩展后台不可用，请重新加载扩展。'}`;
 }
 
 for (const button of document.querySelectorAll('[data-sync]')) {
     button.addEventListener('click', async () => {
-        const site = button.closest('[data-site]').dataset.site;
+        const root = button.closest('[data-site]');
+        const site = root.dataset.site;
         button.disabled = true;
         try {
             await sendMessage({ type: 'sync-now', site });
-            await render();
+            const values = await render();
+            const state = values[`syncStatus:${site}`];
+            if (!state?.status || state.status === 'pending') {
+                const status = root.querySelector('.status');
+                status.textContent = '已排队';
+                status.className = 'status pending';
+                root.querySelector('.detail').textContent = '同步请求已排队，完成后会更新状态。';
+            }
+        } catch (error) {
+            showActionError(root, error);
         } finally {
             button.disabled = false;
         }
@@ -100,12 +120,16 @@ for (const button of document.querySelectorAll('[data-sync]')) {
 }
 
 document.querySelector('[data-health]').addEventListener('click', async event => {
-    event.currentTarget.disabled = true;
+    const button = event.currentTarget;
+    const root = document.querySelector('[data-native-host]');
+    button.disabled = true;
     try {
         await sendMessage({ type: 'native-health' });
         await render();
+    } catch (error) {
+        showActionError(root, error);
     } finally {
-        event.currentTarget.disabled = false;
+        button.disabled = false;
     }
 });
 
@@ -117,7 +141,11 @@ document.querySelector('[data-reload]').addEventListener('click', () => {
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && Object.keys(changes).some(key =>
         key.startsWith('syncStatus:') || key === 'nativeHostStatus')) {
-        void render();
+        void render().catch(error => {
+            for (const root of document.querySelectorAll('[data-site], [data-native-host]')) {
+                showActionError(root, error);
+            }
+        });
     }
 });
 

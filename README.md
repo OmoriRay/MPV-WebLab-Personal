@@ -10,7 +10,7 @@ ModernZ/WebLab 界面脚本、FFmpeg、yt-dlp、Chrome/Edge Cookie Sync 扩展�
 首次使用下载：
 
 ```text
-MPV-WebLab-personal-1.0.0-win-x64.7z
+MPV-WebLab-personal-1.0.1-win-x64.7z
 SHA256SUMS.txt
 ```
 
@@ -22,7 +22,7 @@ SHA256SUMS.txt
 
 - Chrome、Edge：支持 Cookie Sync 扩展，见
   [Chrome/Edge 教程](release/docs/02-Chrome与Edge.md)。
-- Tampermonkey：安装 Release 中的 `external-player-weblab-safe-1.5.1.user.js`，见
+- Tampermonkey：安装 Release 中的 `external-player-weblab-safe-1.5.2.user.js`，见
   [油猴脚本教程](release/docs/03-油猴脚本.md)。
 - Firefox：当前不支持。
 
@@ -37,7 +37,7 @@ Cookie 只会由新设备上的本地扩展生成到安装目录的 `credentials
 更新、卸载和数据保留规则见[更新与卸载](release/docs/04-更新与卸载.md)。下载后可运行：
 
 ```powershell
-Get-FileHash ".\MPV-WebLab-personal-1.0.0-win-x64.7z" -Algorithm SHA256
+Get-FileHash ".\MPV-WebLab-personal-1.0.1-win-x64.7z" -Algorithm SHA256
 ```
 
 结果应与 Release 附带的 `SHA256SUMS.txt` 一致。
@@ -49,9 +49,19 @@ Get-FileHash ".\MPV-WebLab-personal-1.0.0-win-x64.7z" -Algorithm SHA256
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\release\scripts\Build-Release.ps1" `
-  -Version "1.0.0" `
+  -Version "1.0.1" `
   -SourceRoot "D:\Apps\MPV-WebLab"
 ```
+
+## 1.0.1 更新
+
+- 均衡器全零旁路，多窗口设置合并与原子保存。
+- 统一目录播放列表，优化拖动定位，分别设置本地、网络点播和直播缓存。
+- WebLab Safe 1.5.2：预取超时与退避、鼠标事件合并、站内跳转响应。
+- Cookie Sync 0.5.2：保留同步期间的新请求，稳定排序，改善恢复与失败提示。
+- 渲染、色彩和可选平滑显示配置保持原样。
+
+已有用户更新后，请重新加载浏览器扩展、重新安装油猴脚本并刷新网页。
 
 第三方组件继续使用各自许可证。公开再分发注意事项见
 [第三方许可清单](release/LICENSES/THIRD_PARTY_NOTICES.md)。

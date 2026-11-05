@@ -23,6 +23,7 @@ $requiredFiles = @(
     'VERSION',
     'README.md',
     'payload\mpvnet.exe',
+    'payload\COPYING',
     'payload\yt-dlp.exe',
     'payload\ffmpeg\ffmpeg.exe',
     'payload\portable_config\mpv.conf',
@@ -56,7 +57,8 @@ $forbiddenPathPatterns = @(
     '(^|[\\/])argv-recorder\.exe$',
     '(^|[\\/])bilibili-cookies\.txt$',
     '(^|[\\/])youtube-cookies\.txt$',
-    '\.(log|pdb|tmp|bak)$'
+    '\.(log|pdb|tmp|bak|lock)$',
+    '(^|[\\/])[^\\/]*-cookies\.txt$'
 )
 $allFiles = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File)
 $payloadFiles = @(Get-ChildItem -LiteralPath (Join-Path $PackageRoot 'payload') -Recurse -File)

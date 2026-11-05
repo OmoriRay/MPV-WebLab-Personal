@@ -30,6 +30,7 @@ export function serializeSiteCookies(site, cookies) {
         '# Generated locally for MPV WebLab. Do not share.',
     ];
 
+    const rows = [];
     for (const cookie of Array.isArray(cookies) ? cookies : []) {
         if (!cookie ||
             !isSiteCookieDomain(site, cookie.domain) ||
@@ -52,7 +53,7 @@ export function serializeSiteCookies(site, cookies) {
             ? `#HttpOnly_${domain}`
             : domain;
 
-        lines.push([
+        rows.push([
             outputDomain,
             includeSubdomains,
             path,
@@ -63,7 +64,10 @@ export function serializeSiteCookies(site, cookies) {
         ].join('\t'));
     }
 
-    return `${lines.join('\n')}\n`;
+    // Compare full serialized rows, including value/flags, for a total order
+    // independent of getAll() enumeration order and the system locale.
+    rows.sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+    return `${[...lines, ...rows].join('\n')}\n`;
 }
 
 export function serializeYoutubeCookies(cookies) {
