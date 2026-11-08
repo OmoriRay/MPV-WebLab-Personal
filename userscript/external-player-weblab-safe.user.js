@@ -2,8 +2,10 @@
 // @name                    External Player · WebLab Safe
 // @name:zh-CN              外部播放器 · WebLab 安全版
 // @namespace               external-player/weblab-safe-local
-// @version                 1.5.2
+// @version                 1.5.3
 // @description             Launch supported video pages in MPV WebLab with a small, isolated W button.
+// @icon                    data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAABgFBMVEUmQ2gWKUgAAAD3+f0bM1UiOFgiPmJSa4syUHdCWnk+VXLj6fGXpLdGWXUAAP9meJFSYnrS2eWKma1/f3+rtsZuiKj2uVlVVap0hJszQljd4+40SmlMZ4hVbo7FzdpZc5MAf39EXoD///8AVVVYaoVme5sAAH+LqMWjrr61wM/BmFaqv+m/v9/eqFe4klSxjVTa2v/G4v+CcFL/x1p/obt/ka1/jqPf//9oXk1fco3/v/9IZIdKYn9DX4OUqr9AXH5DWHdVVVVARUw9W38/P38A////0lsCHUIBGj0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADmIr8sAAAAgHRSTlP+/gD//v7+av6lpv///wH/////Av8s/wP/+f/bil7/TgKrAQP/LwIa////DAj///8HCf//Hhz/CP//BK+CwgzDmAP+1gQB////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIFj0NoAAAGsSURBVHjadZOJUttADIYlrbS2cRw7JibkDuFo6d1ytNBCT2jf/4mq3XVwPDj/jKW1/k+rxDMCchpRh0IRXDgjquZRW6cfiPo1sKLlXfxMv6M1PXjgJ81i6FD89V7vANqnGezQ0ZtVH0a0jHcBENEIVrffd/oQX+mICuwu38JSgbkDrKrtuYKFmQIR1Ka1W4eQIQkAcG5Sk7OWGJE1ZmlqemzhyANiOTbGDBkEyrKMGfBQ3/MngEV4YUwKwjdq9BD43L2y2KQGLJbqnDAPNQ0sQ2rMufY9AcJZaDVOOeYaD7EBWJgH2upH64/529OYaVU2AAu6GugEvXwiSi9cVwCsBwo3Q918olnP19gC9Dzx1w/wpc8mawDxfm30/uUB9F3cAIwnm8bU5RKlAdAD3lig+E9iClQCN4AT4zD8eXSfZDJ+P3bFLQARiqLw56woYjk4+FQD1QZoSYHHVyiRAh+n3cDFu184rgj+NDNawNsvGhM6hv7ZOum8Qp/pC9oH3Y3Xe9yF4PRUl0Y3a02fv42fjRFJtD/spu7o5fxHsretJKrI+WG7+8dd6+99+g9mbRtgFd0TWgAAAABJRU5ErkJggg==
+// @icon64                  data:image/png;base64,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
 // @match                   *://bilibili.com/*
 // @match                   *://*.bilibili.com/*
 // @match                   *://youtube.com/*
@@ -19,7 +21,8 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.5.2';
+    const VERSION = '1.5.3';
+    const WEBLAB_MARK_URL = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2264%22%20height%3D%2264%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpolygon%20points%3D%2213%2C20%2020%2C20%2025%2C37%2030%2C23%2036%2C23%2041%2C37%2046%2C20%2053%2C20%2045%2C46%2038%2C46%2033%2C32%2028%2C46%2021%2C46%22%20fill%3D%22%23F4F8FF%22%2F%3E%3Cpolygon%20points%3D%2248%2C44%2056%2C49%2048%2C54%22%20fill%3D%22%23FFBD59%22%2F%3E%3C%2Fsvg%3E";
     const SCHEME_PREFIX = 'ush-weblab://MPVNET?v2.';
     const BUTTON_HOST_ID = 'mpv-weblab-lite-root';
     const LAUNCH_COOLDOWN_MS = 2000;
@@ -603,17 +606,14 @@
             height: 52px;
             padding: 0;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,.19);
-            border-radius: 17px;
+            border: 1px solid rgba(130,160,195,.44);
+            border-radius: 15px;
             color: #f8fafc;
             background:
-              radial-gradient(circle at 28% 18%, rgba(255,255,255,.18), transparent 34%),
-              linear-gradient(145deg, rgba(35,45,61,.97), rgba(12,17,25,.98));
+              linear-gradient(155deg, rgba(41,74,114,.98), rgba(21,36,63,.98));
             box-shadow:
-              0 12px 28px rgba(4,8,15,.34),
-              0 2px 6px rgba(4,8,15,.28),
-              inset 0 1px 0 rgba(255,255,255,.13),
-              inset 0 -1px 0 rgba(0,0,0,.48);
+              0 8px 22px rgba(12,24,44,.26),
+              inset 0 1px 0 rgba(244,248,255,.12);
             backdrop-filter: blur(14px) saturate(1.2);
             -webkit-backdrop-filter: blur(14px) saturate(1.2);
             cursor: pointer;
@@ -649,26 +649,17 @@
             outline-offset: 3px;
           }
           .mark {
-            font-size: 19px;
-            line-height: 1;
-            font-weight: 720;
-            letter-spacing: -.055em;
-            text-shadow: 0 1px 2px rgba(0,0,0,.6);
-            transform: translateX(-1px);
+            display: block;
+            width: 46px;
+            height: 46px;
+            font-size: 0;
+            background: url("${WEBLAB_MARK_URL}") center / contain no-repeat;
           }
           .play {
-            position: absolute;
-            right: 7px;
-            bottom: 7px;
-            width: 0;
-            height: 0;
-            border-top: 4px solid transparent;
-            border-bottom: 4px solid transparent;
-            border-left: 6px solid #ffad3d;
-            filter: drop-shadow(0 1px 2px rgba(255,137,22,.38));
+            display: none;
           }
           button[data-state="busy"] { cursor: wait; border-color: rgba(255,173,61,.62); }
-          button[data-state="busy"] .play { animation: breathe .65s ease-in-out infinite alternate; }
+          button[data-state="busy"] .mark { animation: breathe .65s ease-in-out infinite alternate; }
           .toast {
             position: absolute;
             left: 62px;
@@ -692,10 +683,10 @@
           }
           .toast.visible { opacity: 1; transform: translateX(0) scale(1); }
           .toast[data-kind="error"] { background: rgba(116,28,35,.96); border-color: rgba(255,150,150,.18); }
-          @keyframes breathe { to { opacity: .36; transform: scale(.76); } }
+          @keyframes breathe { to { opacity: .6; transform: scale(.94); } }
           @media (prefers-reduced-motion: reduce) {
             .wrap, button, button::before, .toast { transition: none; }
-            button[data-state="busy"] .play { animation: none; }
+            button[data-state="busy"] .mark { animation: none; }
           }
         `;
         const wrap = document.createElement('div');

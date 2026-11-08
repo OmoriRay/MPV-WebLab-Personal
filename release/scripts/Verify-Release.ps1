@@ -23,6 +23,7 @@ $requiredFiles = @(
     'VERSION',
     'README.md',
     'payload\mpvnet.exe',
+    'payload\weblab.ico',
     'payload\COPYING',
     'payload\yt-dlp.exe',
     'payload\ffmpeg\ffmpeg.exe',
@@ -42,6 +43,29 @@ foreach ($relative in $requiredFiles) {
     $path = Join-Path $PackageRoot $relative
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Release is missing a required file: $relative"
+    }
+}
+$extensionRoot = Join-Path $PackageRoot 'payload\weblab-cookie-extension'
+$extensionManifest = [System.IO.File]::ReadAllText((Join-Path $extensionRoot 'manifest.json')) | ConvertFrom-Json
+foreach ($iconMap in @($extensionManifest.icons, $extensionManifest.action.default_icon)) {
+    if ($null -eq $iconMap -or @($iconMap.PSObject.Properties).Count -eq 0) {
+        throw 'Release extension is missing its icon declarations.'
+    }
+    foreach ($entry in $iconMap.PSObject.Properties) {
+        $iconPath = Resolve-MPVWebLabPath -Path ([string] $entry.Value) -BasePath $extensionRoot
+        if (-not $iconPath.StartsWith($extensionRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $iconPath -PathType Leaf)) {
+            throw "Release extension icon is missing or outside its directory: $($entry.Value)"
+        }
+        $bytes = [System.IO.File]::ReadAllBytes($iconPath)
+        if ($bytes.Length -lt 24 -or [Convert]::ToBase64String($bytes[0..7]) -ne 'iVBORw0KGgo=') {
+            throw "Release extension icon is not a PNG: $($entry.Value)"
+        }
+        $width = [uint32] $bytes[16] * 16777216 + [uint32] $bytes[17] * 65536 + [uint32] $bytes[18] * 256 + $bytes[19]
+        $height = [uint32] $bytes[20] * 16777216 + [uint32] $bytes[21] * 65536 + [uint32] $bytes[22] * 256 + $bytes[23]
+        if ($width -ne [int] $entry.Name -or $height -ne [int] $entry.Name) {
+            throw "Release extension icon dimensions do not match $($entry.Name): $($entry.Value)"
+        }
     }
 }
 $documentationFiles = @(Get-ChildItem -LiteralPath (Join-Path $PackageRoot 'docs') -Filter '*.md' -File)

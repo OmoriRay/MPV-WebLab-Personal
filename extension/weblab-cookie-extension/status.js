@@ -1,4 +1,4 @@
-const EXPECTED_EXTENSION_VERSION = '0.5.2';
+const EXPECTED_EXTENSION_VERSION = '0.5.3';
 const labels = {
     ok: '已同步',
     error: '同步失败',

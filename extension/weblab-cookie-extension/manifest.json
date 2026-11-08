@@ -1,7 +1,7 @@
 {
   "name": "MPV WebLab · Cookie Sync",
   "description": "Locally refreshes YouTube and Bilibili cookie files for MPV WebLab.",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA32CLctgQbTVnWF0n17/XjZ1BqJDx1PL2OH/8q0O9tjiOXJ6Q2/Ih+3rf+rK/2pfY6ACLS8X+tv2ijJ6nu8OazkmhMzshVaLEg8H9iZKBu5KZccdiAtEg7FGcnkAxjKDgOdyFck671KCYhlrBJMrUNt2JLO20Km4G9iQadxaEmB6icwbfTKugdjAmaMU7jSgbx7frbZ8rMUMrXhSsez4JB1ywwSJQaUc7SiJSgwnFKN4Whm6wRTD4J0wef5WD7KBJCRjKrnlounwpC0JQJiNCpAhO5vxepXx0bs8ookgxOfZj+Zm2qaOl90pMDG3m8YZa2IfDbSzKVn431NzSxvJdhwIDAQAB",
   "permissions": [
@@ -20,7 +20,19 @@
     "service_worker": "background.mjs",
     "type": "module"
   },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
     "default_title": "MPV WebLab Cookie Sync",
     "default_popup": "status.html"
   }

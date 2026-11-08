@@ -352,6 +352,8 @@ function Register-MPVWebLab {
     $InstallRoot = Resolve-MPVWebLabPath -Path $InstallRoot
     $handler = Join-Path $InstallRoot 'url-scheme-handler-lab\url-scheme-handler-lab.exe'
     $mpvnet = Join-Path $InstallRoot 'mpvnet.exe'
+    $brandIcon = Join-Path $InstallRoot 'weblab.ico'
+    $defaultIcon = if (Test-Path -LiteralPath $brandIcon -PathType Leaf) { '"{0}",0' -f $brandIcon } else { '"{0}",0' -f $mpvnet }
     $nativeManifest = Join-Path $InstallRoot 'youtube-cookie-native-host\native-host-manifest.json'
     foreach ($required in @($handler, $mpvnet, $nativeManifest)) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
@@ -365,6 +367,8 @@ function Register-MPVWebLab {
             New-Item -Path $schemeRoot -Force | Out-Null
             Set-Item -Path $schemeRoot -Value "URL:MPV WebLab $scheme Protocol"
             New-ItemProperty -Path $schemeRoot -Name 'URL Protocol' -Value '' -PropertyType String -Force | Out-Null
+            New-Item -Path "$schemeRoot\DefaultIcon" -Force | Out-Null
+            Set-Item -Path "$schemeRoot\DefaultIcon" -Value $defaultIcon
             $commandKey = Join-Path $schemeRoot 'shell\open\command'
             New-Item -Path $commandKey -Force | Out-Null
             Set-Item -Path $commandKey -Value ('"{0}" run "%1"' -f $handler)
@@ -389,12 +393,14 @@ function Register-MPVWebLab {
         New-Item -Path "$applicationKey\shell\open\command" -Force | Out-Null
         Set-Item -Path "$applicationKey\shell\open\command" -Value ('"{0}" "%1"' -f $mpvnet)
         New-Item -Path "$applicationKey\SupportedTypes" -Force | Out-Null
+        New-Item -Path "$applicationKey\DefaultIcon" -Force | Out-Null
+        Set-Item -Path "$applicationKey\DefaultIcon" -Value $defaultIcon
         foreach ($extension in $script:SupportedVideoExtensions) {
             New-ItemProperty -Path "$applicationKey\SupportedTypes" -Name $extension -Value '' -PropertyType String -Force | Out-Null
         }
 
         New-Item -Path "$progIdKey\DefaultIcon" -Force | Out-Null
-        Set-Item -Path "$progIdKey\DefaultIcon" -Value "$mpvnet,0"
+        Set-Item -Path "$progIdKey\DefaultIcon" -Value $defaultIcon
         New-Item -Path "$progIdKey\shell\open\command" -Force | Out-Null
         Set-Item -Path "$progIdKey\shell\open\command" -Value ('"{0}" "%1"' -f $mpvnet)
         Set-Item -Path $progIdKey -Value 'MPV WebLab Video'

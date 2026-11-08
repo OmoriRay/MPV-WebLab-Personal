@@ -1,6 +1,6 @@
 # Chrome 与 Edge 扩展
 
-包内扩展版本为 `0.5.2`，Chrome 和 Edge 共用同一份代码。扩展只把当前浏览器的
+包内扩展版本为 `0.5.3`，Chrome 和 Edge 共用同一份代码。扩展只把当前浏览器的
 YouTube/Bilibili Cookie 写到本机安装目录，不会上传到网络，也不会随 GitHub 包分发。
 
 ## Chrome
@@ -9,7 +9,7 @@ YouTube/Bilibili Cookie 写到本机安装目录，不会上传到网络，也�
 2. 开启右上角“开发者模式”。
 3. 点击“加载已解压的扩展程序”。
 4. 选择 `<安装目录>\weblab-cookie-extension`。
-5. 确认名称为 `MPV WebLab · Cookie Sync`，版本为 `0.5.2`。
+5. 确认名称为 `MPV WebLab · Cookie Sync`，版本为 `0.5.3`。
 
 ## Edge
 

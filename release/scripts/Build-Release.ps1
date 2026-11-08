@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$')]
-    [string] $Version = '1.0.1',
+    [string] $Version = '1.0.2',
     [string] $SourceRoot = 'D:\Apps\MPV-WebLab',
     [string] $OutputRoot = '',
     [switch] $SkipArchive,
@@ -87,7 +87,13 @@ foreach ($file in Get-ChildItem -LiteralPath $SourceRoot -File) {
     Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $payloadRoot $file.Name) -Force
 }
 
-$userscriptSource = Join-Path $repositoryRoot 'dist\external-player-weblab-safe-1.5.2.user.js'
+$iconSource = Join-Path $SourceRoot 'weblab.ico'
+if (-not (Test-Path -LiteralPath $iconSource -PathType Leaf)) {
+    $iconSource = Join-Path $repositoryRoot 'branding\weblab.ico'
+}
+Copy-Item -LiteralPath $iconSource -Destination (Join-Path $payloadRoot 'weblab.ico') -Force
+
+$userscriptSource = Join-Path $repositoryRoot 'dist\external-player-weblab-safe-1.5.3.user.js'
 if (-not (Test-Path -LiteralPath $userscriptSource -PathType Leaf)) {
     $userscriptSource = Join-Path $SourceRoot 'external-player-weblab-safe.user.js'
 }

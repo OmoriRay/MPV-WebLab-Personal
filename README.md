@@ -1,5 +1,7 @@
 # MPV WebLab Personal
 
+<img src="branding/icons/weblab-128.png" width="88" height="88" alt="WebLab">
+
 面向个人使用的 Windows x64 MPV.NET 网页播放懒人包。包含当前配置好的播放器运行时、
 ModernZ/WebLab 界面脚本、FFmpeg、yt-dlp、Chrome/Edge Cookie Sync 扩展和油猴脚本。
 
@@ -10,7 +12,7 @@ ModernZ/WebLab 界面脚本、FFmpeg、yt-dlp、Chrome/Edge Cookie Sync 扩展�
 首次使用下载：
 
 ```text
-MPV-WebLab-personal-1.0.1-win-x64.7z
+MPV-WebLab-personal-1.0.2-win-x64.7z
 SHA256SUMS.txt
 ```
 
@@ -22,7 +24,7 @@ SHA256SUMS.txt
 
 - Chrome、Edge：支持 Cookie Sync 扩展，见
   [Chrome/Edge 教程](release/docs/02-Chrome与Edge.md)。
-- Tampermonkey：安装 Release 中的 `external-player-weblab-safe-1.5.2.user.js`，见
+- Tampermonkey：安装 Release 中的 `external-player-weblab-safe-1.5.3.user.js`，见
   [油猴脚本教程](release/docs/03-油猴脚本.md)。
 - Firefox：当前不支持。
 
@@ -37,7 +39,7 @@ Cookie 只会由新设备上的本地扩展生成到安装目录的 `credentials
 更新、卸载和数据保留规则见[更新与卸载](release/docs/04-更新与卸载.md)。下载后可运行：
 
 ```powershell
-Get-FileHash ".\MPV-WebLab-personal-1.0.1-win-x64.7z" -Algorithm SHA256
+Get-FileHash ".\MPV-WebLab-personal-1.0.2-win-x64.7z" -Algorithm SHA256
 ```
 
 结果应与 Release 附带的 `SHA256SUMS.txt` 一致。
@@ -49,9 +51,19 @@ Get-FileHash ".\MPV-WebLab-personal-1.0.1-win-x64.7z" -Algorithm SHA256
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\release\scripts\Build-Release.ps1" `
-  -Version "1.0.1" `
+  -Version "1.0.2" `
   -SourceRoot "D:\Apps\MPV-WebLab"
 ```
+
+## 1.0.2 图标更新
+
+![WebLab 图标系列](branding/preview.png)
+
+- 统一网页按钮、油猴列表、扩展管理页、浏览器工具栏与弹窗的图标。
+- 播放入口使用 W 与琥珀色播放标记，同步入口使用青绿色环形箭头。
+- 扩展 0.5.3、油猴 1.5.3；图标随包提供，不增加网络请求和权限。
+- Windows 文件与协议注册使用多分辨率 ICO，保持原有播放方式。
+- 图标 SVG、PNG 和生成工具见 `branding/`、`tools/build-weblab-icons.py`（开发时需要 Pillow）。
 
 ## 1.0.1 更新
 
